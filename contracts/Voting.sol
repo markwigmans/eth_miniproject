@@ -1,21 +1,22 @@
 pragma solidity ^0.4.17;
 
 
-/// @@title Voting with Ballots
 contract Voting {
     event BallotAdded(address creater, uint  ballotId);
     event Voted(address voter, uint ballotId);
+
+    uint constant ZERO = 0;
 
 
     // This will be assigned at the construction phase, where `msg.sender` is the account creating this contract.
     address public chairman = msg.sender;
 
-    Ballot[] ballots;
+    ballot[] ballots;
 
-    struct Ballot {
-        mapping (address => bool) voters;
-        uint[3] votes;
+    struct ballot {
         uint end;
+        uint[3] votes;
+        mapping (address => bool) voters;
     }
 
     modifier restricted() {
@@ -34,38 +35,55 @@ contract Voting {
         _;
     }
 
-    function addBallot(uint daysAfter) restricted {
-        uint id = ballots.push(Ballot({end: now + daysAfter * 1 days}));
+    function addBallot(uint daysAfter) public restricted {
+        uint timestamp = now + daysAfter * 1 days;
+        uint[3] memory empty = [ZERO,ZERO,ZERO];
+
+        uint id = ballots.push(ballot(timestamp, empty));
         BallotAdded(msg.sender, id);
     }
 
-    function giveRightToVote(uint ballotId, address voter) restricted validBallot(ballotId) {
+    function giveRightToVote(uint ballotId, address voter) public restricted validBallot(ballotId) {
         ballots[ballotId].voters[voter] = true;
     }
 
-    function vote(uint ballotId, uint vote) validBallot(ballotId) validVote(ballotId, vote) {
+    function vote(uint ballotId, uint value) validBallot(ballotId) public validVote(ballotId, value) {
         require(ballots[ballotId].voters[msg.sender]);
         // prevent voting for a second time
         ballots[ballotId].voters[msg.sender] = false;
-        ballots[ballotId].votes[vote] += 1;
+        ballots[ballotId].votes[value] += 1;
         Voted(msg.sender, ballotId);
     }
 
-    function winner(uint ballotId) constant validBallot(ballotId) returns (uint[] winners) {
+    function voteResult(uint ballotId) view validBallot(ballotId) public returns (uint[3] result) {
+        // check if ballot is ended
+        require(ballots[ballotId].end <= now);
+        result = ballots[ballotId].votes;
+    }
+
+    function winner(uint ballotId) view validBallot(ballotId) public returns (uint[3] winners) {
         // check if ballot is ended
         require(ballots[ballotId].end <= now);
 
-        uint winningVoteCount = -1; // initialize with impossible value
+        uint winningVoteCount = 0;
+        uint winnersCounter = 0;
         for (uint v = 0; v < ballots[ballotId].votes.length; v++) {
-            if (ballots[ballotId].votes[v] > winningVoteCount) {
-                winningVoteCount = ballots[ballotId].votes[v];
-                winners = new uint[](0);
-                winners.push(v);
-            }
             //  is there a draw?
             if (ballots[ballotId].votes[v] == winningVoteCount) {
-                winners.push(v);
+                winners[winnersCounter] = v;
             }
+            if (ballots[ballotId].votes[v] > winningVoteCount) {
+                winningVoteCount = ballots[ballotId].votes[v];
+                winners = clear(winners);
+                winnersCounter = 0;
+                winners[winnersCounter] = v;
+            }
+        }
+    }
+
+    function clear (uint[3] votes) internal pure returns (uint[3] result) {
+        for (uint i = 0; i < votes.length; i++) {
+            result[i] = ZERO;
         }
     }
 }

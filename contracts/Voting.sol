@@ -1,89 +1,93 @@
-pragma solidity ^0.4.17;
+pragma solidity ^0.4.16;
 
+/*
+A minimal voting contract with the following intended vote flow:
 
+1) the chairman creates the contract;
+2) the chairman add voters to the contract via function: giveRightToVote(address);
+3) the voters votes via the function: vote(uint8): the allowed vote values are: 0, 1 or 2;
+4) the chairman determines the voting result via the function winner().
+
+By design of this 'minimal voting contract,' the chairman can add voters to the Voting for a second, etc. time,
+when the voter has already voted. Also the Voting has no explicit end, so the winner() function can also be used to
+calculate the 'intermediate voting result'.
+*/
 contract Voting {
-    event BallotAdded(address creater, uint  ballotId);
-    event Voted(address voter, uint ballotId);
+    // event send when a voter actual votes
+    event Voted(address voter);
 
-    uint constant ZERO = 0;
+    // the owner/manager of this contract
+    address chairman;
+    // who is allowed to vote
+    mapping(address => bool) voters;
+    // the vote values for the vote options: 0,1,2
+    uint[3] votes;
 
-
-    // This will be assigned at the construction phase, where `msg.sender` is the account creating this contract.
-    address public chairman = msg.sender;
-
-    ballot[] ballots;
-
-    struct ballot {
-        uint end;
-        uint[3] votes;
-        mapping (address => bool) voters;
-    }
-
+    // allow a method call only by the owner of the contract
     modifier restricted() {
         require(msg.sender == chairman);
         _;
     }
 
-    modifier validBallot(uint ballotId) {
-        require(ballotId >= 0 && ballotId < ballots.length);
-        _;
+    // Constructor
+    function Voting() public {
+        chairman = msg.sender;
     }
 
-    modifier validVote(uint ballotId, uint vote) {
-        require(vote >= 0 && vote <= 2);
-        require(ballots[ballotId].end > now);
-        _;
+    // Give a potential voter the right to vote
+    function giveRightToVote(address _voter) public restricted {
+        voters[_voter] = true;
     }
 
-    function addBallot(uint daysAfter) public restricted {
-        uint timestamp = now + daysAfter * 1 days;
-        uint[3] memory empty = [ZERO,ZERO,ZERO];
+    // Perform a vote by the sender
+    function vote(uint8 value) public {
+        // validate if the vote value is in the correct range
+        require(value >= 0 && value <= 2);
+        // validate if the voter is allowed to vote
+        require(voters[msg.sender]);
 
-        uint id = ballots.push(ballot(timestamp, empty));
-        BallotAdded(msg.sender, id);
+        // prevent voting for a second time by the same voter
+        voters[msg.sender] = false;
+        // update vote counter
+        votes[value] += 1;
+
+        // send event to the GUI
+        Voted(msg.sender);
     }
 
-    function giveRightToVote(uint ballotId, address voter) public restricted validBallot(ballotId) {
-        ballots[ballotId].voters[voter] = true;
-    }
+    /*
+    Determine the winner of the voting. As there can be a draw between different vote results,
+    the end result is an array of the vote values that is/are the winner.
 
-    function vote(uint ballotId, uint value) validBallot(ballotId) public validVote(ballotId, value) {
-        require(ballots[ballotId].voters[msg.sender]);
-        // prevent voting for a second time
-        ballots[ballotId].voters[msg.sender] = false;
-        ballots[ballotId].votes[value] += 1;
-        Voted(msg.sender, ballotId);
-    }
+    So if the vote result = [10,4,10] then the winning votes are [0,2] and
+    if the vote result = [10,40,20] then the winning vote is [1].
+    */
+    function winner() view public restricted returns (uint[] winners) {
+        int winningVote = -1;
+        // start with an impossible value for an uint.
+        uint counter = 0;
+        // the number of vote records found with the 'winningVote' value.
 
-    function voteResult(uint ballotId) view validBallot(ballotId) public returns (uint[3] result) {
-        // check if ballot is ended
-        require(ballots[ballotId].end <= now);
-        result = ballots[ballotId].votes;
-    }
-
-    function winner(uint ballotId) view validBallot(ballotId) public returns (uint[3] winners) {
-        // check if ballot is ended
-        require(ballots[ballotId].end <= now);
-
-        uint winningVoteCount = 0;
-        uint winnersCounter = 0;
-        for (uint v = 0; v < ballots[ballotId].votes.length; v++) {
-            //  is there a draw?
-            if (ballots[ballotId].votes[v] == winningVoteCount) {
-                winners[winnersCounter] = v;
+        // find winning vote value
+        for (uint8 w = 0; w < votes.length; w++) {
+            // check if there is a draw
+            if (int(votes[w]) == winningVote) {
+                counter++;
             }
-            if (ballots[ballotId].votes[v] > winningVoteCount) {
-                winningVoteCount = ballots[ballotId].votes[v];
-                winners = clear(winners);
-                winnersCounter = 0;
-                winners[winnersCounter] = v;
+            // higher vote value available?
+            if (int(votes[w]) > winningVote) {
+                winningVote = int(votes[w]);
+                counter = 1;
             }
         }
-    }
 
-    function clear (uint[3] votes) internal pure returns (uint[3] result) {
-        for (uint i = 0; i < votes.length; i++) {
-            result[i] = ZERO;
+        // create result by creating an array of all vote result with the maximum value.
+        winners = new uint[](counter);
+        uint resultCounter = 0;
+        for (uint8 v = 0; v < votes.length; v++) {
+            if (int(votes[v]) == winningVote) {
+                winners[resultCounter++] = v;
+            }
         }
     }
 }

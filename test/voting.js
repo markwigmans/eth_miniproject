@@ -24,14 +24,13 @@ contract('Voting', function (accounts) {
 
         const winners = await instance.winner();
         assert.lengthOf(winners, 1, "winning vote is 1");
+        assert.equal(winners[0], 1, "initial vote is 1");
     });
 
     it("vote without right", function() {
-        var instance;
-        return Voting.deployed()
-            .then(function (value) {
-                instance = value;
-                return instance.vote(1, {from:  accounts[0]});
+        return Voting.new()
+            .then(function (instance) {
+                return instance.vote(1, {from:  accounts[1]});
             })
             .then(function() {
                     assert(false, 'call with insufficient right should have failed');
@@ -41,6 +40,22 @@ contract('Voting', function (accounts) {
                     assert.match(e, /VM Exception[a-zA-Z0-9 ]+: invalid opcode/, "call with insufficient right should have raised VM exception");
                     return true;
             });
+    });
+
+    it("vote only once", async function() {
+        var voter_one = accounts[1];
+        const instance = await Voting.new();
+        await instance.giveRightToVote(voter_one);
+        await instance.vote(1, {from: voter_one});
+        instance.vote(1, {from: voter_one})
+            .then(function() {
+                    assert(false, 'call with insufficient right should have failed');
+                    return true;
+                },
+                function(e) {
+                    assert.match(e, /VM Exception[a-zA-Z0-9 ]+: invalid opcode/, "call with insufficient right should have raised VM exception");
+                    return true;
+                });
     });
 
     it("multiple votes", async function() {
@@ -76,6 +91,20 @@ contract('Voting', function (accounts) {
         await instance.vote(1, {from: accounts[1]});
         await instance.vote(2, {from: accounts[2]});
         await instance.vote(2, {from: accounts[3]});
+
+        const winners = await instance.winner();
+        assert.lengthOf(winners, 2, "winning vote is 1 and 2");
+        assert.equal(winners[0], 1, "winning vote is 1");
+        assert.equal(winners[1], 2, "winning vote is 2");
+    });
+
+
+    it("give right again", async function() {
+        const instance = await Voting.new();
+        await instance.giveRightToVote(accounts[0]);
+        await instance.vote(1, {from: accounts[0]});
+        await instance.giveRightToVote(accounts[0]);
+        await instance.vote(2, {from: accounts[0]});
 
         const winners = await instance.winner();
         assert.lengthOf(winners, 2, "winning vote is 1 and 2");

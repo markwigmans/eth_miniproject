@@ -1,35 +1,31 @@
 var Voting = artifacts.require("Voting");
 
 contract('Voting', function (accounts) {
-    it("create ballot", function () {
-        return Voting.deployed().then(function (instance) {
-            return instance.addBallot.call(10);
-        }).then(function(ballotId) {
-            assert.equal(ballotId.valueOf(), 1, "1 wasn't in the first account");
-        });
-    });
-
-    it("add voter", function () {
-        /*
+    it("add voters", function () {
         var voting;
-        var ballotId;
         var voter_one = accounts[0];
         var voter_two = accounts[1];
-        */
-        /*
         return Voting.deployed().then(function (instance) {
             voting = instance;
-            return voting.addBallot.call(10);
+            return voting.giveRightToVote.call(voter_one)
+        }).then(function () {
+            return voting.giveRightToVote.call(voter_two)
+        }).then(function (winners) {
+            assert.lengthOf(winners, 3, "initial votes");
         })
-            .then(function(_ballotId) {
-            ballotId = _ballotId;
-            return voting.getBallot.call(1);
-        })
-        */
+    });
+
+    it("vote", function () {
+        var voting;
+        var voter_one = accounts[0];
         return Voting.deployed().then(function (instance) {
-            return instance.getBallot();
-        }).then(function(ballot) {
-            console.log("ballot: " + ballot);
+            voting = instance;
+            return voting.giveRightToVote(voter_one)
+        }).then(function () {
+            return voting.vote(1, {from: voter_one});
+        }).then(function (winners) {
+            console.log(winners);
+            assert.lengthOf(winners, 1, "winning vote is 1");
         })
     });
 });

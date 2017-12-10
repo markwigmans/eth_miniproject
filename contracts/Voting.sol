@@ -5,7 +5,7 @@ A minimal voting contract with the following intended vote flow:
 
 1) the chairman creates the contract;
 2) the chairman add voters to the contract via function: giveRightToVote(address);
-3) the voters votes via the function: vote(uint8): the allowed vote values are: 0, 1 or 2;
+3) the voters vote via the function: vote(uint8): the allowed vote values are: 0, 1 or 2;
 4) the chairman determines the voting result via the function winner().
 
 By design of this 'minimal voting contract,' the chairman can add voters to the Voting for a second, etc. time,
@@ -63,11 +63,11 @@ contract Voting {
     if the vote result = [10,40,20] then the winning vote is [1].
     */
     function winner() view public restricted returns (uint[] winners) {
-        int winningVote = -1;
         // start with an impossible value for an uint.
-        uint counter = 0;
+        int winningVote = -1;
         // the number of vote records found with the 'winningVote' value.
-
+        uint counter = 0;
+        
         // find winning vote value
         for (uint8 w = 0; w < votes.length; w++) {
             // check if there is a draw
